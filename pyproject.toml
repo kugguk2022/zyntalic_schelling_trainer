@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zyntalic"
+version = "0.2.0"
+description = "Deterministic synthetic-language toolkit (Zyntalic) with anchor priors and S-O-V-C surface order"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "zolton" }]
+keywords = ["synthetic-language", "conlang", "translation", "schelling-points", "deterministic"]
+dependencies = [
+  "numpy>=1.24.0",
+]
+
+[project.scripts]
+zyntalic = "zyntalic.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0", "ruff>=0.5.0"]
+web = ["fastapi>=0.110.0", "uvicorn[standard]>=0.29.0", "pydantic>=2.0.0"]
+embeddings = ["sentence-transformers>=2.6.0"]
+pdf = ["PyPDF2>=3.0.0"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["zyntalic*"]
+
+[tool.setuptools.package-data]
+zyntalic = ["resources/lexicon/*.json"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["evals"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
