@@ -1,0 +1,5 @@
+[
+  "evals/test_smoke.py::test_ctx_tail_present_in_core_engine",
+  "evals/test_smoke.py::test_determinism_same_input_same_output",
+  "evals/test_smoke.py::test_translate_returns_rows"
+]
