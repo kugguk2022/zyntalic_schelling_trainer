@@ -13,7 +13,7 @@ const App: React.FC = () => {
 
   const [config, setConfig] = useState<TranslationConfig>({
     engine: TranslationEngine.SEMANTIC,
-    mirror: 0.8,
+    mirror: 0.3,  // Lower value shows more Zyntalic vocabulary
     sourceLang: 'Auto-detect',
     targetLang: 'English'
   });

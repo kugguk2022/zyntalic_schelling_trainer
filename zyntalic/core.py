@@ -511,10 +511,12 @@ def generate_embedding(seed_key: str, dim: int = 300, W=None):
 
 
 # -------------------- Public API --------------------
-def generate_entry(seed_word: str, mirror_rate: float = 0.8, W=None) -> Dict:
+def generate_entry(seed_word: str, mirror_rate: float = 0.3, W=None) -> Dict:
     """
     Generate a full dictionary entry deterministically.
     seed_word: The English input (e.g., 'Love') which seeds ALL randomness.
+    mirror_rate: Probability of using chiasmus templates (0.0-1.0).
+                 Lower values produce more Zyntalic vocabulary output.
     """
     rng = get_rng(seed_word)
 

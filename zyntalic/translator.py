@@ -30,7 +30,7 @@ def _clean_lemma(text: str) -> str:
 def translate_sentence(
     text: str,
     *,
-    mirror_rate: float = 0.8,
+    mirror_rate: float = 0.3,  # Lower value = more Zyntalic vocabulary
     engine: str = "core",
     W=None,
 ) -> Dict:
