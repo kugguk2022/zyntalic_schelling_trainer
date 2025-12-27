@@ -48,6 +48,7 @@ def clean_pdf_text(raw_text: str) -> str:
     metadata_patterns = [
         r'%PDF-[\d\.]+',
         r'%����',
+        r'%[^\n]*',  # Remove PDF comment lines
         r'/Author\([^)]*\)',
         r'/Creator\([^)]*\)',
         r'/Producer\([^)]*\)',
@@ -56,6 +57,7 @@ def clean_pdf_text(raw_text: str) -> str:
         r'/Keywords\([^)]*\)',
         r'/CreationDate\([^)]*\)',
         r'/ModDate\([^)]*\)',
+        r'/[A-Z][a-z]+\([^)]*\)',  # Any /Property(value) pattern
         r'\d+ \d+ obj',
         r'endobj',
         r'stream\s*.*?\s*endstream',
@@ -65,11 +67,20 @@ def clean_pdf_text(raw_text: str) -> str:
         r'trailer',
         r'startxref',
         r'%%EOF',
+        r'/Filter\s+/[A-Za-z]+',
+        r'/Length1?\s+\d+',
+        r'/Type\s+/[A-Za-z]+',
     ]
     
     cleaned = raw_text
     for pattern in metadata_patterns:
         cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Remove non-printable characters and binary data
+    # Keep only ASCII printable, common punctuation, spaces, and basic Latin
+    cleaned = ''.join(char for char in cleaned if (
+        char.isprintable() or char in '\n\r\t'
+    ) and ord(char) < 127 or char.isspace())
     
     # Replace common PDF encoding issues
     replacements = {
@@ -83,17 +94,23 @@ def clean_pdf_text(raw_text: str) -> str:
     for old, new in replacements.items():
         cleaned = cleaned.replace(old, new)
     
+    # Remove patterns that look like encoding artifacts
+    cleaned = re.sub(r'[^\w\s.,!?;:\'"\-()\[\]]+', '', cleaned)
+    
     # Remove multiple spaces and normalize whitespace
     cleaned = re.sub(r' +', ' ', cleaned)
     cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned)
     
-    # Remove lines that are just numbers or single characters (often page numbers)
+    # Remove lines that are just numbers, single characters, or look like metadata
     lines = cleaned.split('\n')
     filtered_lines = []
     for line in lines:
         line = line.strip()
-        # Keep line if it has substantial content
-        if len(line) > 3 and not line.isdigit():
+        # Skip empty, numeric-only, single char, or metadata-looking lines
+        if (len(line) > 3 and 
+            not line.isdigit() and 
+            not re.match(r'^[A-Z][a-z]+$', line) and  # Single words capitalized (often artifacts)
+            not re.match(r'^\W+$', line)):  # Only punctuation
             filtered_lines.append(line)
     
     cleaned = '\n'.join(filtered_lines)
