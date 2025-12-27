@@ -20,6 +20,10 @@ Optional:
 - Web API: `pip install -e ".[web]"`
 - Better embeddings: `pip install -e ".[embeddings]"`
 
+# running test suite
+```bash
+python3 -c "from zyntalic.test_suite import demo_test_suite; demo_test_suite()"
+```
 ## CLI
 
 Translate a sentence:
