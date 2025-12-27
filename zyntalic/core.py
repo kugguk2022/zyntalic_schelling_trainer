@@ -142,6 +142,27 @@ ANCHORS = [
 
 # -------------------- Lexicon Prior --------------------
 _LEXICON_CACHE: Optional[Dict[str, dict]] = None
+_VOCAB_MAPPINGS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
+
+
+def load_vocabulary_mappings(filepath: str = "data/embeddings/vocabulary_mappings.json") -> Dict[str, Dict[str, str]]:
+    """Load pre-generated vocabulary mappings from English to Zyntalic."""
+    global _VOCAB_MAPPINGS_CACHE
+    if _VOCAB_MAPPINGS_CACHE is not None:
+        return _VOCAB_MAPPINGS_CACHE
+    
+    # Try to load from file
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                _VOCAB_MAPPINGS_CACHE = json.load(f)
+                return _VOCAB_MAPPINGS_CACHE
+        except Exception:
+            pass
+    
+    # Return empty dict if not found
+    _VOCAB_MAPPINGS_CACHE = {}
+    return _VOCAB_MAPPINGS_CACHE
 
 
 def load_lexicons(dirpath: str = "lexicon") -> Dict[str, dict]:
@@ -371,7 +392,7 @@ def mirrored_sentence_anchored(rng, anchors, weights) -> str:
 
 
 def plain_sentence_anchored(rng, anchors, weights) -> str:
-    """Standard style using Lexicon Lists."""
+    """Standard style using Lexicon Lists and Zyntalic vocabulary."""
     base_adj = ["bright", "mysterious", "ancient", "vivid", "whimsical"]
     base_noun = ["journey", "whisper", "echo", "saga", "pattern"]
     base_verb = ["weaves", "reveals", "hides", "balances"]
@@ -380,11 +401,18 @@ def plain_sentence_anchored(rng, anchors, weights) -> str:
     pool_noun, w_noun = _mix_lists(anchors, weights, "nouns", base_noun)
     pool_verb, w_verb = _mix_lists(anchors, weights, "verbs", base_verb)
 
-    adj = _weighted_sample(rng, pool_adj, w_adj) or rng.choice(base_adj)
-    noun = _weighted_sample(rng, pool_noun, w_noun) or rng.choice(base_noun)
-    verb = _weighted_sample(rng, pool_verb, w_verb) or rng.choice(base_verb)
+    adj_en = _weighted_sample(rng, pool_adj, w_adj) or rng.choice(base_adj)
+    noun_en = _weighted_sample(rng, pool_noun, w_noun) or rng.choice(base_noun)
+    verb_en = _weighted_sample(rng, pool_verb, w_verb) or rng.choice(base_verb)
 
-    return f"A {adj} {noun} {verb} itself."
+    # Try to translate to Zyntalic
+    vocab_mappings = load_vocabulary_mappings()
+    
+    adj = vocab_mappings.get("adjectives", {}).get(adj_en, generate_word(f"adj::{adj_en}"))
+    noun = vocab_mappings.get("nouns", {}).get(noun_en, generate_word(f"noun::{noun_en}"))
+    verb = vocab_mappings.get("verbs", {}).get(verb_en, generate_word(f"verb::{verb_en}"))
+
+    return f"{adj} {noun} {verb}"
 
 
 # -------------------Korean tail ------------------------

@@ -1,0 +1,17 @@
+{
+  "num_anchors": 20,
+  "embedding_dimension": 384,
+  "vocabulary_categories": [
+    "adjectives",
+    "nouns",
+    "verbs"
+  ],
+  "words_per_category": {
+    "adjectives": 509,
+    "nouns": 507,
+    "verbs": 520
+  },
+  "total_vocabulary_size": 1536,
+  "cached_words": 1000,
+  "has_transformer_embeddings": true
+}
