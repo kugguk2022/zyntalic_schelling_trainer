@@ -7,10 +7,13 @@ import socket
 import platform
 from pathlib import Path
 
-import uvicorn
-
 # Add project root to path so we can import zyntalic
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    import uvicorn
+except ImportError:
+    uvicorn = None
 
 from apps.web.app import app
 
@@ -59,6 +62,9 @@ HOST = "0.0.0.0"
 def start_server():
     print(f"Starting server on {HOST}:{PORT}...")
     try:
+        if uvicorn is None:
+            print("uvicorn is not installed. Install with: pip install -e '.[web]'")
+            sys.exit(1)
         uvicorn.run(app, host=HOST, port=PORT, log_level="info")
     except Exception as e:
         print(f"CRITICAL SERVER ERROR: {e}")
@@ -99,15 +105,19 @@ def start_desktop():
         import webview
         webview.create_window("Zyntalic Translator", browser_url, width=1024, height=768)
         webview.start()
+    except ImportError:
+        print("pywebview is not installed. Install with: pip install -e '.[desktop]'")
+        webbrowser.open(browser_url)
     except Exception as e:
         print(f"pywebview failed to start ({e}). Falling back to system browser.")
         webbrowser.open(browser_url)
 
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("Exiting...")
+    # Keep main thread alive so the server thread persists
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Exiting...")
 
 if __name__ == "__main__":
     start_desktop()

@@ -148,12 +148,16 @@ _PROJECTION_CACHE = _PROJECTION_CACHE_SENTINEL
 
 
 def load_vocabulary_mappings(filepath: str = "data/embeddings/vocabulary_mappings.json") -> Dict[str, Dict[str, str]]:
-    """Load pre-generated vocabulary mappings from English to Zyntalic."""
+    """Load pre-generated vocabulary mappings from English to Zyntalic.
+
+    Tries the provided path, then falls back to a repo-relative default. Returns
+    an empty mapping on any error so translation can proceed without hard failure.
+    """
     global _VOCAB_MAPPINGS_CACHE
     if _VOCAB_MAPPINGS_CACHE is not None:
         return _VOCAB_MAPPINGS_CACHE
     
-    # Try to load from file
+    # Try to load from file (direct path)
     if os.path.exists(filepath):
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
@@ -161,6 +165,18 @@ def load_vocabulary_mappings(filepath: str = "data/embeddings/vocabulary_mapping
                 return _VOCAB_MAPPINGS_CACHE
         except Exception:
             pass
+
+    # Fallback to repo-relative path
+    try:
+        from pathlib import Path
+        repo_root = Path(__file__).resolve().parents[1]
+        alt_path = repo_root / "data" / "embeddings" / "vocabulary_mappings.json"
+        if alt_path.exists():
+            with alt_path.open('r', encoding='utf-8') as f:
+                _VOCAB_MAPPINGS_CACHE = json.load(f)
+                return _VOCAB_MAPPINGS_CACHE
+    except Exception:
+        pass
     
     # Return empty dict if not found
     _VOCAB_MAPPINGS_CACHE = {}
@@ -211,22 +227,6 @@ def load_lexicons(dirpath: str = "lexicon") -> Dict[str, dict]:
         # If resources aren't available (e.g., frozen apps), just return empty.
         data = {}
 
-    _LEXICON_CACHE = data
-    return _LEXICON_CACHE
-    data: Dict[str, dict] = {}
-    if not os.path.isdir(dirpath):
-        _LEXICON_CACHE = {}
-        return _LEXICON_CACHE
-    for fn in os.listdir(dirpath):
-        if not fn.endswith(".json"):
-            continue
-        try:
-            with open(os.path.join(dirpath, fn), "r", encoding="utf-8") as f:
-                obj = json.load(f)
-            key = fn[:-5]
-            data[key] = obj
-        except Exception:
-            continue
     _LEXICON_CACHE = data
     return _LEXICON_CACHE
 

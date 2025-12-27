@@ -21,12 +21,19 @@ _PROJECTION_W = core.get_projection()
 
 
 def warm_translation_pipeline() -> None:
-    """Preload heavy resources (lexicons, mappings, anchor vecs, projection)."""
-    core.load_lexicons()
-    core.load_vocabulary_mappings()
-    core._get_anchor_vecs()  # type: ignore  # intentionally using internal cache
-    # projection already memoized at import; ensure loaded if available
-    core.get_projection()
+    """Preload heavy resources (lexicons, mappings, anchor vecs, projection).
+
+    Any failure is swallowed so server startup does not abort; translation will
+    still function with fallback behavior.
+    """
+    try:
+        core.load_lexicons()
+        core.load_vocabulary_mappings()
+        core._get_anchor_vecs()  # type: ignore  # intentionally using internal cache
+        # projection already memoized at import; ensure loaded if available
+        core.get_projection()
+    except Exception as exc:  # pragma: no cover - defensive guard
+        print(f"[warmup] Warning: preload skipped due to: {exc}")
 
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
