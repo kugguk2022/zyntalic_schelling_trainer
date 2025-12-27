@@ -41,11 +41,18 @@ export const performTranslation = async (
     
     // Backend returns { rows: [{ source, target, lemma, anchors, engine }] }
     // We need to map this to TranslationResult
-    // For now, let's join all targets if multiple sentences
+    // Format to show both source and target for clarity
     
     // If rows is missing or empty, handle gracefully
     const rows = data.rows || [];
-    const translatedText = rows.map((r: any) => r.target).join(" ");
+    
+    // Format each translation to show: [English] → Zyntalic
+    const translatedText = rows.map((r: any) => {
+      const source = r.source || "Unknown";
+      const target = r.target || "???";
+      // Show the original sentence followed by its translation
+      return `[${source}]\n→ ${target}`;
+    }).join("\n\n");
 
     return {
       text: translatedText || "No translation generated.",
