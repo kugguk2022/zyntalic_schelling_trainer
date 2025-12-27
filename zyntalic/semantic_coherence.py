@@ -636,6 +636,22 @@ class SemanticCoherenceProcessor:
         }
         
         return theme_to_anchors.get(theme, ANCHORS[:3])
+    
+    # -------------------- Test Compatibility Methods --------------------
+    
+    def analyze_coherence(self, text: str) -> float:
+        """Analyze semantic coherence of text (alias for compatibility)."""
+        analysis = self.analyze_semantic_coherence(text)
+        return analysis.coherence_score
+    
+    def detect_metaphors(self, text: str) -> List[ConceptualMapping]:
+        """Detect metaphors in text (alias for compatibility)."""
+        analysis = self.analyze_semantic_coherence(text)
+        return analysis.metaphor_chains
+    
+    def compute_anchor_weights(self, text: str) -> Dict[str, float]:
+        """Compute anchor weights for text (alias for compatibility)."""
+        return self._compute_anchor_activation(text)
 
 # -------------------- Demo Function --------------------
 
@@ -679,5 +695,6 @@ def demo_semantic_coherence():
         
         print()
 
-if __name__ == "__main__":
+
+# -------------------- Demo Function --------------------
     demo_semantic_coherence()

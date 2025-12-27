@@ -534,6 +534,21 @@ class ZyntalicLexicon:
                 comparisons += 1
         
         return total_distance / comparisons if comparisons > 0 else 0.0
+    
+    # -------------------- Test Compatibility Methods --------------------
+    
+    def find_related_words(self, headword: str, relation_type: RelationType) -> List[str]:
+        """Find words related to the given word by relation type (alias for compatibility)."""
+        entry = self.get_entry(headword)
+        if not entry:
+            return []
+        
+        related = []
+        for relation in entry.relations:
+            if relation.relation_type == relation_type:
+                related.append(relation.target_word)
+        
+        return related
 
 # -------------------- Demo Function --------------------
 

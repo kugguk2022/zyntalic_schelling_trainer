@@ -532,6 +532,24 @@ class AdvancedZyntalicProcessor:
         variations['future_zyntalic'] = future_form
         
         return variations
+    
+    # -------------------- Test Compatibility Methods --------------------
+    
+    def translate_with_analysis(self, text: str) -> 'TranslationResult':
+        """Translate text with full analysis (alias for compatibility)."""
+        variation = LanguageVariation(register=Register.FORMAL)
+        return self.translate_advanced(text, variation)
+    
+    def translate_with_register(self, text: str, register: Register) -> 'TranslationResult':
+        """Translate text with specific register (alias for compatibility)."""
+        variation = LanguageVariation(register=register)
+        return self.translate_advanced(text, variation)
+    
+    def translate_with_dialect(self, text: str, dialect: Dialect) -> 'TranslationResult':
+        """Translate text with specific dialect (alias for compatibility)."""
+        variation = LanguageVariation(dialect=dialect)
+        options = TranslationOptions(use_dialectal_forms=True)
+        return self.translate_advanced(text, variation, options)
 
 # -------------------- Demo Function --------------------
 
