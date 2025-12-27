@@ -8,6 +8,7 @@ import subprocess
 import sys
 import os
 import json
+from urllib import request, error
 
 def check_server_running():
     """Check if server is running on port 8001."""
@@ -28,22 +29,27 @@ def check_frontend_built():
     return os.path.exists(assets_path) and len(os.listdir(assets_path)) > 0
 
 def check_dependencies():
-    """Check if key dependencies are installed."""
-    try:
-        import fastapi
-        import uvicorn
-        import PyPDF2
-        return True
-    except ImportError as e:
-        return False, str(e)
+    """Check if key dependencies are installed.
+
+    Returns (ok, message). Message is empty on success.
+    """
+    required = ("fastapi", "uvicorn", "PyPDF2")
+    missing = []
+    for mod in required:
+        try:
+            __import__(mod)
+        except ImportError:
+            missing.append(mod)
+    if missing:
+        return False, f"Missing dependencies: {', '.join(missing)}"
+    return True, ""
 
 def test_api():
-    """Test if API is responding."""
+    """Test if API is responding using stdlib only."""
     try:
-        import requests
-        response = requests.get('http://127.0.0.1:8001/health', timeout=5)
-        return response.status_code == 200
-    except:
+        resp = request.urlopen("http://127.0.0.1:8001/health", timeout=5)
+        return resp.status == 200
+    except Exception:
         return False
 
 def main():
@@ -74,12 +80,12 @@ def main():
 
     # Check 3: Dependencies
     print("[3] Dependencies...")
-    deps_ok = check_dependencies()
+    deps_ok, deps_msg = check_dependencies()
     if deps_ok:
         print("    ✅ Core dependencies installed")
     else:
         print("    ❌ Missing dependencies")
-        print("    💡 Fix: Run 'pip install -e \".[web]\"'")
+        print(f"    💡 Fix: Run 'pip install -e \".[web]\"' ({deps_msg})")
     print()
 
     # Check 4: API

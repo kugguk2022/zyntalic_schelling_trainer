@@ -4,15 +4,28 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import json
 import io
 import os
 from pathlib import Path
+import time
 
 # Optional: PyPDF import
 try:
     import PyPDF2
 except ImportError:
     PyPDF2 = None
+
+try:
+    import multipart  # type: ignore
+    MULTIPART_INSTALLED = True
+except ImportError:
+    MULTIPART_INSTALLED = False
+
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
 
 from zyntalic.translator import translate_text, warm_translation_pipeline
 from zyntalic.utils.cache import (
@@ -28,7 +41,10 @@ app = FastAPI(title="Zyntalic API", version="0.3.0")
 async def startup_event():
     # Warm up cache on startup
     init_cache()
-    warm_translation_pipeline()
+    try:
+        warm_translation_pipeline()
+    except Exception as exc:
+        print(f"[startup] Translation warmup skipped: {exc}")
 
 # Mount static directory
 # We now point to the built React app in zyntalic-flow/dist
@@ -62,6 +78,14 @@ class TranslateRequest(BaseModel):
     text: str
     mirror_rate: float = 0.3  # Lower value = more Zyntalic vocabulary, higher = more English templates
     engine: str = "core"  # "core"|"chiasmus"|"transformer"|"test_suite"
+
+
+class GeminiTranslateRequest(BaseModel):
+    text: str
+    mirror_rate: float = 0.3
+    target_lang: str = "English"
+    source_lang: str | None = None
+    engine: str | None = None
 
 @app.get("/")
 def read_root():
@@ -174,69 +198,84 @@ def clean_pdf_text(raw_text: str) -> str:
     return cleaned
 
 
-@app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
-    """Upload and extract text from PDF or text files."""
-    
-    # Handle plain text files
-    if file.filename.endswith(('.txt', '.md')):
-        try:
-            content = await file.read()
-            text = content.decode('utf-8', errors='ignore')
-            return {"text": text.strip()}
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error reading text file: {str(e)}")
-    
-    # Handle PDF files
-    if not file.filename.endswith('.pdf'):
-        raise HTTPException(
-            status_code=400, 
-            detail="File must be PDF, TXT, or MD format"
-        )
-    
-    if not PyPDF2:
-        raise HTTPException(
-            status_code=501, 
-            detail="PyPDF2 not installed. Run: pip install PyPDF2"
-        )
+if MULTIPART_INSTALLED:
+
+    @app.post("/upload")
+    async def upload_pdf(file: UploadFile = File(...)):
+        """Upload and extract text from PDF or text files."""
         
-    try:
-        content = await file.read()
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+        # Handle plain text files
+        if file.filename.endswith((".txt", ".md")):
+            try:
+                content = await file.read()
+                text = content.decode("utf-8", errors="ignore")
+                return {"text": text.strip()}
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error reading text file: {str(e)}")
         
-        # Check if PDF is encrypted
-        if pdf_reader.is_encrypted:
+        # Handle PDF files
+        if not file.filename.endswith(".pdf"):
             raise HTTPException(
                 status_code=400,
-                detail="PDF is encrypted. Please provide an unencrypted PDF."
+                detail="File must be PDF, TXT, or MD format",
             )
         
-        # Extract text from all pages
-        raw_text = ""
-        for page_num, page in enumerate(pdf_reader.pages):
-            try:
-                page_text = page.extract_text()
-                if page_text:
-                    raw_text += page_text + "\n"
-            except Exception as e:
-                # Skip problematic pages but continue
-                print(f"Warning: Could not extract text from page {page_num + 1}: {e}")
-                continue
-        
-        # Clean the extracted text
-        cleaned_text = clean_pdf_text(raw_text)
-        
-        if not cleaned_text or len(cleaned_text) < 10:
+        if not PyPDF2:
             raise HTTPException(
-                status_code=400, 
-                detail="No readable text found in PDF. The file may be scanned images or corrupted."
+                status_code=500,
+                detail="PyPDF2 not installed. Install with: pip install -e '.[pdf]'",
             )
-        
-        return {"text": cleaned_text}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+        try:
+            content = await file.read()
+            pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
+
+            # Check if PDF is encrypted
+            if pdf_reader.is_encrypted:
+                raise HTTPException(
+                    status_code=400,
+                    detail="PDF is encrypted. Please provide an unencrypted PDF.",
+                )
+
+            # Extract text from all pages
+            raw_text = ""
+            for page_num, page in enumerate(pdf_reader.pages):
+                try:
+                    page_text = page.extract_text()
+                    if page_text:
+                        raw_text += page_text + "\n"
+                except Exception as e:
+                    # Skip problematic pages but continue
+                    print(f"Warning: Could not extract text from page {page_num + 1}: {e}")
+                    continue
+
+            # Clean the extracted text
+            cleaned_text = clean_pdf_text(raw_text)
+
+            if not cleaned_text or len(cleaned_text) < 10:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No readable text found in PDF. The file may be scanned images or corrupted.",
+                )
+
+            return {"text": cleaned_text}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+else:
+
+    @app.post("/upload")
+    async def upload_pdf_unavailable():
+        """Fallback when python-multipart is missing."""
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "File upload requires python-multipart. "
+                "Install with: pip install python-multipart or pip install -e '.[web,pdf]'."
+            ),
+        )
 
 
 @app.get("/health")
@@ -266,3 +305,59 @@ def translate(req: TranslateRequest):
         )
 
     return {"rows": stored_rows, "cached": False}
+
+
+def _build_gemini_prompt(req: GeminiTranslateRequest) -> str:
+    is_auto = not req.source_lang or req.source_lang.lower() == "auto-detect"
+    source_clause = (
+        "The source language is unknown. Detect it before translating."
+        if is_auto
+        else f"The source language is {req.source_lang}."
+    )
+    return (
+        "You are the Zyntalic Engine v0.3, a deterministic semantic translation system. "
+        f"Your goal is to translate the input text to {req.target_lang}. "
+        f"{source_clause} "
+        f"The mirror parameter is set to {req.mirror_rate}, where lower skews literal and higher skews semantic flow. "
+        "Respond strictly as JSON with fields translatedText, confidence, detectedSourceLanguage (optional), and semanticNote."
+    )
+
+
+@app.post("/translate/gemini")
+def translate_gemini(req: GeminiTranslateRequest):
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured on the server.")
+
+    if genai is None:
+        raise HTTPException(
+            status_code=501,
+            detail="google-generativeai not installed. Run: pip install .[web,gemini]",
+        )
+
+    genai.configure(api_key=api_key)
+    prompt = _build_gemini_prompt(req)
+    start = time.time()
+
+    try:
+        model = genai.GenerativeModel("gemini-1.5-pro-002")
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": req.mirror_rate,
+                "response_mime_type": "application/json",
+            },
+        )
+        payload = json.loads(response.text or "{}")
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Gemini request failed: {exc}") from exc
+
+    latency_ms = int((time.time() - start) * 1000)
+
+    return {
+        "translated_text": payload.get("translatedText") or "Translation failed to parse.",
+        "latency_ms": latency_ms,
+        "confidence": payload.get("confidence", 1.0),
+        "detected_source_language": payload.get("detectedSourceLanguage"),
+        "semantic_note": payload.get("semanticNote"),
+    }

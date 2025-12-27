@@ -3,6 +3,15 @@ __pycache__/
 *.pyo
 *.pyd
 .venv/
+
+# Added ignores
+.venv*/
+.pytest_cache/
+**/__pycache__/
+**/*.pyc
+data/cache/
+data/**/*.tmp
+
 .env
 dist/
 build/
