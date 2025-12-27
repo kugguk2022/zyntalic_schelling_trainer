@@ -12,8 +12,19 @@ except ImportError:
     PyPDF2 = None
 
 from zyntalic.translator import translate_text
+from zyntalic.utils.cache import (
+    get_cached_translation,
+    put_cached_translation,
+    init_cache,
+)
 
 app = FastAPI(title="Zyntalic API", version="0.3.0")
+
+
+@app.on_event("startup")
+async def startup_event():
+    # Warm up cache on startup
+    init_cache()
 
 # Mount static directory
 # We now point to the built React app in zyntalic-flow/dist
@@ -192,5 +203,24 @@ def health():
 
 @app.post("/translate")
 def translate(req: TranslateRequest):
+    # First try cache to avoid re-generation
+    cached = get_cached_translation(req.text, req.engine, req.mirror_rate)
+    if cached:
+        return {"rows": [cached], "cached": True}
+
     rows = translate_text(req.text, mirror_rate=req.mirror_rate, engine=req.engine)
-    return {"rows": rows}
+
+    stored_rows = []
+    for row in rows:
+        stored_rows.append(
+            put_cached_translation(
+                source=row.get("source", req.text),
+                target=row.get("target", ""),
+                engine=row.get("engine", req.engine),
+                mirror_rate=req.mirror_rate,
+                anchors=row.get("anchors", []),
+                embedding=row.get("embedding") if isinstance(row, dict) else None,
+            )
+        )
+
+    return {"rows": stored_rows, "cached": False}
