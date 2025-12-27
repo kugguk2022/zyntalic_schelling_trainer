@@ -14,7 +14,7 @@ try:
 except ImportError:
     PyPDF2 = None
 
-from zyntalic.translator import translate_text
+from zyntalic.translator import translate_text, warm_translation_pipeline
 from zyntalic.utils.cache import (
     get_cached_translation,
     put_cached_translation,
@@ -28,6 +28,7 @@ app = FastAPI(title="Zyntalic API", version="0.3.0")
 async def startup_event():
     # Warm up cache on startup
     init_cache()
+    warm_translation_pipeline()
 
 # Mount static directory
 # We now point to the built React app in zyntalic-flow/dist

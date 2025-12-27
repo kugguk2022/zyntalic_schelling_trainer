@@ -143,6 +143,8 @@ ANCHORS = [
 # -------------------- Lexicon Prior --------------------
 _LEXICON_CACHE: Optional[Dict[str, dict]] = None
 _VOCAB_MAPPINGS_CACHE: Optional[Dict[str, Dict[str, str]]] = None
+_PROJECTION_CACHE_SENTINEL = object()
+_PROJECTION_CACHE = _PROJECTION_CACHE_SENTINEL
 
 
 def load_vocabulary_mappings(filepath: str = "data/embeddings/vocabulary_mappings.json") -> Dict[str, Dict[str, str]]:
@@ -485,6 +487,15 @@ def load_projection(path: str = "models/W.npy"):
         return np.load(path)
     except Exception:
         return None
+
+
+def get_projection(path: str = "models/W.npy"):
+    """Load and memoize projection matrix so repeated translations avoid disk I/O."""
+    global _PROJECTION_CACHE
+    if _PROJECTION_CACHE is not _PROJECTION_CACHE_SENTINEL:
+        return _PROJECTION_CACHE
+    _PROJECTION_CACHE = load_projection(path)
+    return _PROJECTION_CACHE
 
 
 def apply_projection(vec: List[float], W) -> List[float]:

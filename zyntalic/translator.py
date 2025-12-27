@@ -16,6 +16,18 @@ from typing import Dict, List, Optional
 
 from . import core
 
+# Memoize projection to avoid repeated disk reads during translation hot path
+_PROJECTION_W = core.get_projection()
+
+
+def warm_translation_pipeline() -> None:
+    """Preload heavy resources (lexicons, mappings, anchor vecs, projection)."""
+    core.load_lexicons()
+    core.load_vocabulary_mappings()
+    core._get_anchor_vecs()  # type: ignore  # intentionally using internal cache
+    # projection already memoized at import; ensure loaded if available
+    core.get_projection()
+
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 def _clean_lemma(text: str) -> str:
@@ -95,7 +107,7 @@ def translate_sentence(
             # fall back to core
             engine = "core"
 
-    entry = core.generate_entry(lemma or src, mirror_rate=mirror_rate, W=W)
+    entry = core.generate_entry(lemma or src, mirror_rate=mirror_rate, W=W or _PROJECTION_W)
     # entry contains 'sentence' (with ctx tail) and anchor weights
     return {
         "source": src,
