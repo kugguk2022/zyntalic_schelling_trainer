@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-import os
 import io
+import os
+from pathlib import Path
 
 # Optional: PyPDF import
 try:
@@ -28,18 +31,30 @@ async def startup_event():
 
 # Mount static directory
 # We now point to the built React app in zyntalic-flow/dist
-# If running fro project root:
-static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "zyntalic-flow", "dist")
+# If running from project root:
+repo_root = Path(__file__).resolve().parents[2]
+static_dir = repo_root / "zyntalic-flow" / "dist"
+public_dir = repo_root / "zyntalic-flow" / "public"
 
-if not os.path.exists(static_dir):
+if not static_dir.exists():
     # Fallback to old static if build fails or during dev
     print(f"WARNING: React build not found at {static_dir}. Falling back to legacy static.")
-    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    static_dir = Path(__file__).resolve().parent / "static"
 
-app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
-# Mount the root static files (like index.html, favicon, etc) separately or handled by root route?
-# Fastapi StaticFiles at root matches everything.
-# Better strategy: mount assets at /assets and serve index.html at root
+assets_dir = static_dir / "assets"
+if assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+else:
+    print(f"WARNING: Assets directory not found at {assets_dir}. Static assets will 404 until the frontend is built.")
+
+
+def _find_frontend_file(filename: str) -> Path | None:
+    """Return the first matching file from the built or public frontend folders."""
+    for base in (static_dir, public_dir):
+        candidate = base / filename
+        if candidate.exists():
+            return candidate
+    return None
 
 
 class TranslateRequest(BaseModel):
@@ -49,7 +64,33 @@ class TranslateRequest(BaseModel):
 
 @app.get("/")
 def read_root():
-    return FileResponse(os.path.join(static_dir, "index.html"))
+    return FileResponse(static_dir / "index.html")
+
+
+@app.get("/favicon.ico")
+def favicon():
+    icon_path = _find_frontend_file("favicon.ico") or _find_frontend_file("favicon.svg")
+    if icon_path:
+        media = "image/x-icon" if icon_path.suffix == ".ico" else "image/svg+xml"
+        return FileResponse(icon_path, media_type=media)
+    raise HTTPException(status_code=404, detail="Favicon not found")
+
+
+@app.get("/favicon.svg")
+def favicon_svg():
+    icon_path = _find_frontend_file("favicon.svg") or _find_frontend_file("favicon.ico")
+    if icon_path:
+        media = "image/svg+xml" if icon_path.suffix == ".svg" else "image/x-icon"
+        return FileResponse(icon_path, media_type=media)
+    raise HTTPException(status_code=404, detail="Favicon not found")
+
+
+@app.get("/index.css")
+def index_css():
+    css_path = _find_frontend_file("index.css")
+    if css_path:
+        return FileResponse(css_path, media_type="text/css")
+    raise HTTPException(status_code=404, detail="index.css not found")
 
 def clean_pdf_text(raw_text: str) -> str:
     """Clean extracted PDF text by removing metadata, garbled characters, and extra whitespace."""
