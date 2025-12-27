@@ -40,24 +40,133 @@ class TranslateRequest(BaseModel):
 def read_root():
     return FileResponse(os.path.join(static_dir, "index.html"))
 
+def clean_pdf_text(raw_text: str) -> str:
+    """Clean extracted PDF text by removing metadata, garbled characters, and extra whitespace."""
+    import re
+    
+    # Remove common PDF metadata patterns
+    metadata_patterns = [
+        r'%PDF-[\d\.]+',
+        r'%����',
+        r'/Author\([^)]*\)',
+        r'/Creator\([^)]*\)',
+        r'/Producer\([^)]*\)',
+        r'/Title\([^)]*\)',
+        r'/Subject\([^)]*\)',
+        r'/Keywords\([^)]*\)',
+        r'/CreationDate\([^)]*\)',
+        r'/ModDate\([^)]*\)',
+        r'\d+ \d+ obj',
+        r'endobj',
+        r'stream\s*.*?\s*endstream',
+        r'<<[^>]*>>',
+        r'\[http://[^\]]*\]',
+        r'xref',
+        r'trailer',
+        r'startxref',
+        r'%%EOF',
+    ]
+    
+    cleaned = raw_text
+    for pattern in metadata_patterns:
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Replace common PDF encoding issues
+    replacements = {
+        '�': '',  # Remove replacement character
+        '\x00': '',  # Remove null bytes
+        '\ufffd': '',  # Remove Unicode replacement character
+        '\r\n': '\n',  # Normalize line endings
+        '\r': '\n',
+    }
+    
+    for old, new in replacements.items():
+        cleaned = cleaned.replace(old, new)
+    
+    # Remove multiple spaces and normalize whitespace
+    cleaned = re.sub(r' +', ' ', cleaned)
+    cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned)
+    
+    # Remove lines that are just numbers or single characters (often page numbers)
+    lines = cleaned.split('\n')
+    filtered_lines = []
+    for line in lines:
+        line = line.strip()
+        # Keep line if it has substantial content
+        if len(line) > 3 and not line.isdigit():
+            filtered_lines.append(line)
+    
+    cleaned = '\n'.join(filtered_lines)
+    
+    # Final cleanup: remove leading/trailing whitespace
+    cleaned = cleaned.strip()
+    
+    return cleaned
+
+
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
-    if not PyPDF2:
-        raise HTTPException(status_code=501, detail="PyPDF2 not installed")
+    """Upload and extract text from PDF or text files."""
     
+    # Handle plain text files
+    if file.filename.endswith(('.txt', '.md')):
+        try:
+            content = await file.read()
+            text = content.decode('utf-8', errors='ignore')
+            return {"text": text.strip()}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error reading text file: {str(e)}")
+    
+    # Handle PDF files
     if not file.filename.endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="File must be a PDF")
+        raise HTTPException(
+            status_code=400, 
+            detail="File must be PDF, TXT, or MD format"
+        )
+    
+    if not PyPDF2:
+        raise HTTPException(
+            status_code=501, 
+            detail="PyPDF2 not installed. Run: pip install PyPDF2"
+        )
         
     try:
         content = await file.read()
         pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
         
-        return {"text": text.strip()}
+        # Check if PDF is encrypted
+        if pdf_reader.is_encrypted:
+            raise HTTPException(
+                status_code=400,
+                detail="PDF is encrypted. Please provide an unencrypted PDF."
+            )
+        
+        # Extract text from all pages
+        raw_text = ""
+        for page_num, page in enumerate(pdf_reader.pages):
+            try:
+                page_text = page.extract_text()
+                if page_text:
+                    raw_text += page_text + "\n"
+            except Exception as e:
+                # Skip problematic pages but continue
+                print(f"Warning: Could not extract text from page {page_num + 1}: {e}")
+                continue
+        
+        # Clean the extracted text
+        cleaned_text = clean_pdf_text(raw_text)
+        
+        if not cleaned_text or len(cleaned_text) < 10:
+            raise HTTPException(
+                status_code=400, 
+                detail="No readable text found in PDF. The file may be scanned images or corrupted."
+            )
+        
+        return {"text": cleaned_text}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
 
 
 @app.get("/health")

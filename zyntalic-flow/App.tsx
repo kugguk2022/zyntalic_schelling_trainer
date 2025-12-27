@@ -36,12 +36,55 @@ const App: React.FC = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const text = ev.target?.result as string;
-        setInputText(text);
-      };
-      reader.readAsText(file);
+      // Check file type
+      const validTypes = ['.txt', '.md', '.pdf'];
+      const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+      
+      if (!validTypes.includes(fileExt)) {
+        setError(`Invalid file type. Please upload TXT, MD, or PDF files.`);
+        return;
+      }
+      
+      // Handle text files directly
+      if (fileExt === '.txt' || fileExt === '.md') {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const text = ev.target?.result as string;
+          setInputText(text);
+        };
+        reader.onerror = () => {
+          setError('Failed to read file. Please try again.');
+        };
+        reader.readAsText(file);
+      } else if (fileExt === '.pdf') {
+        // Handle PDF via backend API
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        setIsProcessing(true);
+        setError(null);
+        
+        fetch('/upload', {
+          method: 'POST',
+          body: formData,
+        })
+          .then(response => {
+            if (!response.ok) {
+              return response.json().then(err => {
+                throw new Error(err.detail || 'Failed to process PDF');
+              });
+            }
+            return response.json();
+          })
+          .then(data => {
+            setInputText(data.text);
+            setIsProcessing(false);
+          })
+          .catch(err => {
+            setError(err.message || 'Failed to process PDF file.');
+            setIsProcessing(false);
+          });
+      }
     }
   };
 
@@ -125,7 +168,7 @@ const App: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
                   </button>
-                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".txt,.md" />
+                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".txt,.md,.pdf" />
                   <button 
                     onClick={() => {
                       setInputText('');
