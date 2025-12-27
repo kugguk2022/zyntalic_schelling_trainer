@@ -40,9 +40,24 @@ def translate_sentence(
     engine:
       - "core": rule-based + anchor mixing (recommended baseline)
       - "chiasmus": uses chiasmus renderer if available (more stylized)
+      - "transformer": uses semantic anchor matching via sentence-transformers
     """
     src = (text or "").strip()
     lemma = _clean_lemma(src)
+
+    if engine == "transformer":
+        try:
+            from .transformers import translate_transformer
+            return {
+                "source": src,
+                "target": translate_transformer(src, mirror_rate=mirror_rate),
+                "lemma": lemma,
+                "anchors": [], # TODO: populate if needed
+                "engine": "transformer",
+            }
+        except Exception as e:
+            # print(f"Transformer error: {e}") # debug
+            engine = "core"
 
     if engine == "chiasmus":
         try:

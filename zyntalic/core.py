@@ -413,21 +413,30 @@ def base_embedding(key: str, dim: int = 300):
     return [rng.random() for _ in range(dim)]
 
 
-def _build_anchor_vecs(dim: int = 300) -> Dict[str, List[float]]:
+
+_ANCHOR_VECS_CACHE: Optional[Dict[str, List[float]]] = None
+
+def _get_anchor_vecs(dim: int = 300) -> Dict[str, List[float]]:
+    global _ANCHOR_VECS_CACHE
+    if _ANCHOR_VECS_CACHE is not None:
+        return _ANCHOR_VECS_CACHE
+    
     vecs = {}
     for name in ANCHORS:
         label = name.replace("_", " ")
         vecs[name] = _normalize(base_embedding(label, dim))
-    return vecs
-
-
-ANCHOR_VECS = _build_anchor_vecs()
+    _ANCHOR_VECS_CACHE = vecs
+    return _ANCHOR_VECS_CACHE
 
 
 def anchor_weights_for_vec(vec: List[float], top_k: int = 3):
     v = _normalize(vec)
     scores = []
-    for a, av in ANCHOR_VECS.items():
+    
+    # Use lazy getter
+    anchor_vecs = _get_anchor_vecs(len(v))
+    
+    for a, av in anchor_vecs.items():
         scores.append((a, _dot(v, _normalize(av))))
     scores.sort(key=lambda x: x[1], reverse=True)
     top = scores[:top_k]
@@ -463,7 +472,10 @@ def generate_embedding(seed_key: str, dim: int = 300, W=None):
     if canon == vb and W is None:
         # no projection: softly mix with anchors
         aw0 = anchor_weights_for_vec(vb, top_k=3)
-        vecs = [vb] + [ANCHOR_VECS[a] for a, _ in aw0]
+        
+        anchor_vecs = _get_anchor_vecs()
+        vecs = [vb] + [anchor_vecs[a] for a, _ in aw0]
+        
         ws = [0.5] + [0.5 * w for _, w in aw0]
         canon = _normalize(_mix(vecs, ws))
     aw = anchor_weights_for_vec(canon, top_k=3)
