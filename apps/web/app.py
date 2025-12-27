@@ -34,7 +34,7 @@ app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), 
 class TranslateRequest(BaseModel):
     text: str
     mirror_rate: float = 0.8
-    engine: str = "core"  # "core"|"chiasmus"|"transformer"
+    engine: str = "core"  # "core"|"chiasmus"|"transformer"|"test_suite"
 
 @app.get("/")
 def read_root():

@@ -2,7 +2,8 @@
 export enum TranslationEngine {
   SEMANTIC = 'Transformer (Semantic)',
   NEURAL = 'Neural (Direct)',
-  LITERAL = 'Deterministic (Literal)'
+  LITERAL = 'Deterministic (Literal)',
+  TEST_SUITE = 'Test Suite (Validation)'
 }
 
 export interface TranslationConfig {

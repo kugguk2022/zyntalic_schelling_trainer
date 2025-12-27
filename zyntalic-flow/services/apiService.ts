@@ -15,7 +15,9 @@ export const performTranslation = async (
     if (config.engine.includes("Transformer")) {
         engine = "transformer";
     } else if (config.engine.includes("Neural")) {
-        engine = "chiasmus"; 
+        engine = "chiasmus";
+    } else if (config.engine.includes("Test Suite")) {
+        engine = "test_suite";
     }
 
     const response = await fetch(`${API_BASE_URL}/translate`, {
