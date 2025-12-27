@@ -284,27 +284,41 @@ def health():
 
 @app.post("/translate")
 def translate(req: TranslateRequest):
-    # First try cache to avoid re-generation
-    cached = get_cached_translation(req.text, req.engine, req.mirror_rate)
-    if cached:
-        return {"rows": [cached], "cached": True}
+    try:
+        print(f"[TRANSLATE] Request received: text='{req.text[:50]}...', engine={req.engine}, mirror_rate={req.mirror_rate}")
+        
+        # First try cache to avoid re-generation
+        cached = get_cached_translation(req.text, req.engine, req.mirror_rate)
+        if cached:
+            print(f"[TRANSLATE] Cache hit, returning cached result")
+            return {"rows": [cached], "cached": True}
 
-    rows = translate_text(req.text, mirror_rate=req.mirror_rate, engine=req.engine)
+        print(f"[TRANSLATE] Cache miss, generating new translation...")
+        rows = translate_text(req.text, mirror_rate=req.mirror_rate, engine=req.engine)
+        print(f"[TRANSLATE] Generated {len(rows)} translation rows")
 
-    stored_rows = []
-    for row in rows:
-        stored_rows.append(
-            put_cached_translation(
-                source=row.get("source", req.text),
-                target=row.get("target", ""),
-                engine=row.get("engine", req.engine),
-                mirror_rate=req.mirror_rate,
-                anchors=row.get("anchors", []),
-                embedding=row.get("embedding") if isinstance(row, dict) else None,
+        stored_rows = []
+        for i, row in enumerate(rows):
+            print(f"[TRANSLATE] Row {i}: source='{row.get('source', 'N/A')[:30]}...', target='{row.get('target', 'N/A')[:30]}...'")
+            stored_rows.append(
+                put_cached_translation(
+                    source=row.get("source", req.text),
+                    target=row.get("target", ""),
+                    engine=row.get("engine", req.engine),
+                    mirror_rate=req.mirror_rate,
+                    anchors=row.get("anchors", []),
+                    embedding=row.get("embedding") if isinstance(row, dict) else None,
+                )
             )
-        )
 
-    return {"rows": stored_rows, "cached": False}
+        print(f"[TRANSLATE] Success: returning {len(stored_rows)} rows")
+        return {"rows": stored_rows, "cached": False}
+        
+    except Exception as exc:
+        print(f"[TRANSLATE] ERROR: {type(exc).__name__}: {exc}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Translation failed: {exc}") from exc
 
 
 def _build_gemini_prompt(req: GeminiTranslateRequest) -> str:
