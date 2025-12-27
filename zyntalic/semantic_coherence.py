@@ -64,6 +64,7 @@ class SemanticContext:
     coherence_links: List[Tuple[str, str, str]] = field(default_factory=list)  # (sent1, sent2, link_type)
 
 @dataclass
+@dataclass
 class SemanticAnalysis:
     """Result of semantic analysis."""
     primary_theme: Optional[str] = None
@@ -71,6 +72,11 @@ class SemanticAnalysis:
     conceptual_metaphors: List[ConceptualMapping] = field(default_factory=list)
     coherence_score: float = 0.0
     anchor_activation: Dict[str, float] = field(default_factory=dict)
+    
+    @property
+    def metaphor_chains(self) -> List[ConceptualMapping]:
+        """Alias for conceptual_metaphors for compatibility."""
+        return self.conceptual_metaphors
 
 # -------------------- Semantic Coherence Processor --------------------
 

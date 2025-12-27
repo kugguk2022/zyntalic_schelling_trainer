@@ -68,6 +68,7 @@ class TranslationOptions:
     use_dialectal_forms: bool = False
 
 @dataclass
+@dataclass 
 class AdvancedTranslationResult:
     """Result of advanced translation with analysis."""
     zyntalic_text: str
@@ -79,6 +80,11 @@ class AdvancedTranslationResult:
     coherence_score: float = 0.0
     register_analysis: Dict[str, any] = field(default_factory=dict)
     cultural_elements: List[str] = field(default_factory=list)
+    
+    @property
+    def translation(self) -> str:
+        """Alias for zyntalic_text for compatibility."""
+        return self.zyntalic_text
 
 # -------------------- Advanced Language Processor --------------------
 
