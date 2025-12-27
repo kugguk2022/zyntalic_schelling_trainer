@@ -245,7 +245,9 @@ class AdvancedZyntalicProcessor:
         # Step 6: Apply Phonological Processes
         if options.apply_sound_changes:
             phonological_translation = self.phonology.apply_sound_changes(dialect_translation)
-            result.phonological_analysis = self.phonology.analyze_phonotactics(phonological_translation)
+            # Import the analysis function from phonology module
+            from .phonology import analyze_phonotactics
+            result.phonological_analysis = analyze_phonotactics(phonological_translation)
         else:
             phonological_translation = dialect_translation
         
