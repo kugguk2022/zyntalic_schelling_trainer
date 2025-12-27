@@ -67,11 +67,12 @@ class SemanticContext:
 @dataclass
 class SemanticAnalysis:
     """Result of semantic analysis."""
+    coherence_score: float = 0.0
     primary_theme: Optional[str] = None
     semantic_fields: Dict[SemanticField, float] = field(default_factory=dict)
     conceptual_metaphors: List[ConceptualMapping] = field(default_factory=list)
-    coherence_score: float = 0.0
     anchor_activation: Dict[str, float] = field(default_factory=dict)
+    discourse_entities: List[str] = field(default_factory=list)
     
     @property
     def metaphor_chains(self) -> List[ConceptualMapping]:
