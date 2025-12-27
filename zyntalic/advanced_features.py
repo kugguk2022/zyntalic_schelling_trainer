@@ -68,18 +68,20 @@ class TranslationOptions:
     use_dialectal_forms: bool = False
 
 @dataclass
-@dataclass 
 class AdvancedTranslationResult:
     """Result of advanced translation with analysis."""
-    zyntalic_text: str
-    original_text: str
-    morphological_analysis: Dict[str, any] = field(default_factory=dict)
-    phonological_analysis: Dict[str, any] = field(default_factory=dict)
-    syntactic_analysis: Dict[str, any] = field(default_factory=dict)
-    semantic_analysis: Dict[str, any] = field(default_factory=dict)
-    coherence_score: float = 0.0
-    register_analysis: Dict[str, any] = field(default_factory=dict)
-    cultural_elements: List[str] = field(default_factory=list)
+    def __init__(self, zyntalic_text, original_text, morphological_analysis=None,
+                 phonological_analysis=None, syntactic_analysis=None, semantic_analysis=None,
+                 coherence_score=0.0, register_analysis=None, cultural_elements=None):
+        self.zyntalic_text = zyntalic_text
+        self.original_text = original_text
+        self.morphological_analysis = morphological_analysis or {}
+        self.phonological_analysis = phonological_analysis or {}
+        self.syntactic_analysis = syntactic_analysis or {}
+        self.semantic_analysis = semantic_analysis or {}
+        self.coherence_score = coherence_score
+        self.register_analysis = register_analysis or {}
+        self.cultural_elements = cultural_elements or []
     
     @property
     def translation(self) -> str:
