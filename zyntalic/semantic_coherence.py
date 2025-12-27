@@ -64,15 +64,16 @@ class SemanticContext:
     coherence_links: List[Tuple[str, str, str]] = field(default_factory=list)  # (sent1, sent2, link_type)
 
 @dataclass
-@dataclass
 class SemanticAnalysis:
     """Result of semantic analysis."""
-    coherence_score: float = 0.0
-    primary_theme: Optional[str] = None
-    semantic_fields: Dict[SemanticField, float] = field(default_factory=dict)
-    conceptual_metaphors: List[ConceptualMapping] = field(default_factory=list)
-    anchor_activation: Dict[str, float] = field(default_factory=dict)
-    discourse_entities: List[str] = field(default_factory=list)
+    def __init__(self, coherence_score=0.0, primary_theme=None, semantic_fields=None, 
+                 conceptual_metaphors=None, anchor_activation=None, discourse_entities=None):
+        self.coherence_score = coherence_score
+        self.primary_theme = primary_theme
+        self.semantic_fields = semantic_fields or {}
+        self.conceptual_metaphors = conceptual_metaphors or []
+        self.anchor_activation = anchor_activation or {}
+        self.discourse_entities = discourse_entities or []
     
     @property
     def metaphor_chains(self) -> List[ConceptualMapping]:
